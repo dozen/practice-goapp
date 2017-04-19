@@ -26,10 +26,9 @@ var (
 )
 
 func main() {
-	var err error
-	db, err = sql.Open("mysql", "root:@/sample")
-	if err != nil {
-		panic(err)
+	var e error
+	if db, e = sql.Open("mysql", "root:@/sample"); e != nil {
+		panic(e)
 	}
 	store = sessions.New(sessions.Config{Cookie:SessionName})
 	store.UseDatabase(redisSession)
@@ -42,54 +41,72 @@ func main() {
 	r.GET("/signup", initial(signup))
 	r.POST("/signup", initial(postSignup))
 	r.GET("/category/:id", initial(category))
-	r.GET("/theme/:id", initial(theme))
-	r.POST("/theme/new", initial(postNewTheme))
+	r.GET("/theme/:id", initial(theme))		//new含む
+	r.POST("/theme/new", initial(postTheme))
+	r.GET("/joke/:id", initial(joke))			//new含む
+	r.POST("/joke/new", initial(postJoke))
+	r.GET("/rate/new", initial(newRate))
+	r.POST("/rate/new", initial(postRate))
 
-	if err := fasthttp.ListenAndServe(Port, r.Handler); err != nil {
-		fmt.Println(err.Error())
+	if e := fasthttp.ListenAndServe(Port, r.Handler); e != nil {
+		fmt.Println(e.Error())
 	}
 }
 
 func initial(handler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(c *fasthttp.RequestCtx) {
-		_ = store.StartFasthttp(c)
 		handler(c)
 	}
 }
 
 func index(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
+
 	c.WriteString("Hello, World!")
 }
 
 func login(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func postLogin(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
+	fmt.Printf("%#v\n", string(c.FormValue("account")))
+	fmt.Printf("%#v\n", string(c.FormValue("password")))
 }
 
 func logout(c *fasthttp.RequestCtx) {
-
-}
-
-func register(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func signup(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func postSignup(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func category(c *fasthttp.RequestCtx) {
-
+	s := store.StartFasthttp(c)
+	_ = s
 }
 
 func theme(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
+
 	var id int
 	if val, ok := c.UserValue("id").(string); !ok {
 		c.NotFound()
@@ -111,14 +128,22 @@ func theme(c *fasthttp.RequestCtx) {
 }
 
 func newTheme(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
+
 	c.WriteString("New Theme Create.")
 }
 
-func postNewTheme(c *fasthttp.RequestCtx) {
+func postTheme(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func joke(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
+
 	var id int
 	if val, ok := c.UserValue("id").(string); !ok {
 		c.NotFound()
@@ -140,14 +165,21 @@ func joke(c *fasthttp.RequestCtx) {
 }
 
 func newJoke(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
-func postNewJoke(c *fasthttp.RequestCtx) {
+func postJoke(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func rate(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
+
 	var id int
 	if val, ok := c.UserValue("id").(string); !ok {
 		c.NotFound()
@@ -169,9 +201,13 @@ func rate(c *fasthttp.RequestCtx) {
 }
 
 func newRate(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
 
 func postRate(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	_ = s
 
 }
