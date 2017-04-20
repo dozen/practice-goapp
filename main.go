@@ -10,7 +10,7 @@ import (
 	"github.com/kataras/go-sessions/sessiondb/redis/service"
 	"github.com/valyala/fasthttp"
 	"net/url"
-	"strconv"
+	"log"
 )
 
 const (
@@ -34,28 +34,28 @@ func main() {
 	store.UseDatabase(redisSession)
 
 	r := fasthttprouter.New()
-	r.GET("/", initial(index))
-	r.GET("/login", initial(login))
-	r.POST("/login", initial(postLogin))
-	r.GET("/logout", initial(logout))
-	r.GET("/signup", initial(signup))
-	r.POST("/signup", initial(postSignup))
-	r.GET("/category/:id", initial(category))
-	r.GET("/theme/:id", initial(theme))		//new含む
-	r.POST("/theme/new", initial(postTheme))
-	r.GET("/joke/:id", initial(joke))			//new含む
-	r.POST("/joke/new", initial(postJoke))
-	r.GET("/rate/new", initial(newRate))
-	r.POST("/rate/new", initial(postRate))
+	r.GET("/", index)
+
+	r.GET("/login", getLogin)
+	r.POST("/login", postLogin)
+
+	r.GET("/logout", getLogout)
+
+	r.GET("/signup", getSignup)
+	r.POST("/signup", postSignup)
+
+	r.GET("/category/:id", getCategory)
+
+	r.GET("/theme/:id"/*new*/, getThemeIDNew)
+	r.POST("/theme/new", postThemeNew)
+
+	r.GET("/joke/:id"/*new*/, getJokeIDNew)
+	r.POST("/joke/new", postJokeNew)
+
+	r.POST("/rating", postRating)
 
 	if e := fasthttp.ListenAndServe(Port, r.Handler); e != nil {
 		fmt.Println(e.Error())
-	}
-}
-
-func initial(handler fasthttp.RequestHandler) fasthttp.RequestHandler {
-	return func(c *fasthttp.RequestCtx) {
-		handler(c)
 	}
 }
 
@@ -66,7 +66,7 @@ func index(c *fasthttp.RequestCtx) {
 	c.WriteString("Hello, World!")
 }
 
-func login(c *fasthttp.RequestCtx) {
+func getLogin(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
 
@@ -80,13 +80,14 @@ func postLogin(c *fasthttp.RequestCtx) {
 	fmt.Printf("%#v\n", string(c.FormValue("password")))
 }
 
-func logout(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
+func getLogout(c *fasthttp.RequestCtx) {
+	//s := store.StartFasthttp(c)
 
+	store.DestroyFasthttp(c)
+	log.Printf("%#v", store.StartFasthttp(c))
 }
 
-func signup(c *fasthttp.RequestCtx) {
+func getSignup(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
 
@@ -98,116 +99,66 @@ func postSignup(c *fasthttp.RequestCtx) {
 
 }
 
-func category(c *fasthttp.RequestCtx) {
+func getCategory(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
+
+	//id, ok := ParamID(c)
+
 }
 
-func theme(c *fasthttp.RequestCtx) {
+func getThemeIDNew(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	if jump := Authenticate(c, s); jump != nil {
+		jump()
+		return
+	}
+}
+
+func postThemeNew(c *fasthttp.RequestCtx) {
+	s := store.StartFasthttp(c)
+	if jump := Authenticate(c, s); jump != nil {
+		jump()
+		return
+	}
+}
+
+func getJokeIDNew(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
-
-	var id int
-	if val, ok := c.UserValue("id").(string); !ok {
-		c.NotFound()
-	} else {
-		if val == "new" {
-			newTheme(c)
-			return
-		} else {
-			var err error
-			id, err = strconv.Atoi(val)
-			if err != nil {
-				c.NotFound()
-				return
-			}
-		}
+	if jump := Authenticate(c, s); jump != nil {
+		jump()
+		return
 	}
 
-	c.WriteString(strconv.Itoa(id))
-}
+	isNew, id, ok := ParamNew(c)
 
-func newTheme(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-
-	c.WriteString("New Theme Create.")
-}
-
-func postTheme(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-
-}
-
-func joke(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-
-	var id int
-	if val, ok := c.UserValue("id").(string); !ok {
-		c.NotFound()
-	} else {
-		if val == "new" {
-			newJoke(c)
-			return
-		} else {
-			var err error
-			id, err = strconv.Atoi(val)
-			if err != nil {
-				c.NotFound()
-				return
-			}
-		}
+	if ok == false {
+		c.WriteString(fmt.Sprintf("%#v\n", string(c.Referer())))
 	}
 
-	c.WriteString(strconv.Itoa(id))
+	c.WriteString(fmt.Sprintf("isNew: %#v\n", isNew))
+	c.WriteString(fmt.Sprintf("id: %#v\n", id))
+
+	//c.WriteString(strconv.Itoa(id))
 }
 
-func newJoke(c *fasthttp.RequestCtx) {
+func postJokeNew(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
-
-}
-
-func postJoke(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-
-}
-
-func rate(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-
-	var id int
-	if val, ok := c.UserValue("id").(string); !ok {
-		c.NotFound()
-	} else {
-		if val == "new" {
-			newRate(c)
-			return
-		} else {
-			var err error
-			id, err = strconv.Atoi(val)
-			if err != nil {
-				c.NotFound()
-				return
-			}
-		}
+	if jump := Authenticate(c, s); jump != nil {
+		jump()
+		return
 	}
 
-	c.WriteString(strconv.Itoa(id))
 }
 
-func newRate(c *fasthttp.RequestCtx) {
+func postRating(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
-
-}
-
-func postRate(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
+	if jump := Authenticate(c, s); jump != nil {
+		jump()
+		return
+	}
 
 }

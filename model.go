@@ -4,7 +4,7 @@ import "time"
 
 type User struct {
 	ID        int
-	Account   int
+	Account   string
 	PassHash  string
 	CreatedAt time.Time
 
