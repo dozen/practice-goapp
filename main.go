@@ -3,34 +3,60 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"net/url"
+
 	"github.com/buaazp/fasthttprouter"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/kataras/go-sessions"
 	"github.com/kataras/go-sessions/sessiondb/redis"
 	"github.com/kataras/go-sessions/sessiondb/redis/service"
 	"github.com/valyala/fasthttp"
-	"net/url"
-	"log"
 )
 
 const (
-	SessionName = "isucon_session"
-	Port        = ":8080"
+	SessionName     = "rack.session"
+	Port            = ":8080"
+	ContentsPerPage = 20
 )
 
 var (
 	baseUrl      *url.URL
 	db           *sql.DB
-	redisSession = redis.New(service.Config{Addr: "192.168.99.100:6379"})
-	store        sessions.Sessions
+	redisSession = redis.New(service.Config{
+		Addr:     ":6379",
+		Database: "0",
+	})
+	store sessions.Sessions
+
+	ThemeCategories = []string{
+		"人物",
+		"人物2人以上",
+		"動物",
+		"風景",
+		"無機物",
+		"イラスト",
+		"その他",
+	}
+
+	JokeCategories = []string{
+		"バカ",
+		"シュール",
+		"ブラック",
+		"身内",
+		"例え",
+		"その他",
+	}
 )
 
 func main() {
 	var e error
-	if db, e = sql.Open("mysql", "root:@/sample"); e != nil {
+	if db, e = sql.Open("mysql", "root:@/joker2"); e != nil {
 		panic(e)
 	}
-	store = sessions.New(sessions.Config{Cookie:SessionName})
+	store = sessions.New(sessions.Config{
+		Cookie: SessionName,
+	})
 	store.UseDatabase(redisSession)
 
 	r := fasthttprouter.New()
@@ -46,10 +72,10 @@ func main() {
 
 	r.GET("/category/:id", getCategory)
 
-	r.GET("/theme/:id"/*new*/, getThemeIDNew)
+	r.GET("/theme/:id" /*new*/, getThemeIDNew)
 	r.POST("/theme/new", postThemeNew)
 
-	r.GET("/joke/:id"/*new*/, getJokeIDNew)
+	r.GET("/joke/:id" /*new*/, getJokeIDNew)
 	r.POST("/joke/new", postJokeNew)
 
 	r.POST("/rating", postRating)
@@ -62,8 +88,9 @@ func main() {
 func index(c *fasthttp.RequestCtx) {
 	s := store.StartFasthttp(c)
 	_ = s
-
-	c.WriteString("Hello, World!")
+	for i := 0; i < 1000; i++ {
+		c.WriteString("Hello, World!")
+	}
 }
 
 func getLogin(c *fasthttp.RequestCtx) {

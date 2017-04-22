@@ -1,0 +1,47 @@
+CREATE DATABASE IF NOT EXISTS `joker2` DEFAULT CHARACTER SET utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `joker2`.`users` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `account` VARCHAR(127) NOT NULL UNIQUE,
+  `passhash` VARCHAR(255) NOT NULL,
+  `registered_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `joker2`.`images` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL,
+  `image` VARCHAR(511) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `joker2`.`themes` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT NOT NULL,
+  `image_id` BIGINT NOT NULL,
+  `category_id` BIGINT NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+)DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `joker2`.`jokes` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `theme_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `category_id` BIGINT NOT NULL,
+  `content` VARCHAR(1023) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`)
+)DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `joker2`.`joke_rates` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `joke_id` BIGINT NOT NULL,
+  `user_id` BIGINT NOT NULL,
+  `rate` TINYINT NOT NULL,
+  `comment` VARCHAR(511) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `updated_at` DATETIME,
+  PRIMARY KEY (`id`)
+)DEFAULT CHARSET=utf8mb4;

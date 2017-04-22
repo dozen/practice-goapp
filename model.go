@@ -1,6 +1,8 @@
 package main
 
-import "time"
+import (
+	"time"
+)
 
 type User struct {
 	ID        int
@@ -17,7 +19,7 @@ type Joke struct {
 	ID        int
 	UserID    int
 	ThemeID   int
-	Text      string
+	Content   string
 	CreatedAt time.Time
 
 	Author *User
@@ -45,6 +47,7 @@ type Theme struct {
 	Category string
 
 	Author *User
+	Image  *Image
 	Jokes  []*Joke
 }
 
@@ -53,6 +56,7 @@ type Image struct {
 	ImageID   int
 	CreatedAt time.Time
 	UserID    int
+	File      string
 
 	Author *User
 	Theme  *Theme

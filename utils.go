@@ -1,15 +1,16 @@
 package main
 
 import (
-	"github.com/valyala/fasthttp"
-	"strconv"
-	"github.com/kataras/go-sessions"
-	"database/sql"
 	"crypto/sha512"
+	"database/sql"
 	"encoding/hex"
+	"github.com/kataras/go-sessions"
+	"github.com/valyala/fasthttp"
+	"regexp"
+	"strconv"
 )
 
-func MustPrepare(stmt *sql.Stmt, err error) *sql.Stmt {
+func Must(stmt *sql.Stmt, err error) *sql.Stmt {
 	if err != nil {
 		panic(err)
 	}
@@ -46,17 +47,27 @@ func Authenticate(c *fasthttp.RequestCtx, s sessions.Session) func() {
 }
 
 func TryLogin(account, password string) *User {
-	stmt := MustPrepare(
-		db.Prepare("SELECT id, account, passhash FROM users WHERE account = ?",
-	))
+	stmt := Must(
+		db.Prepare("SELECT id, account, passhash FROM users WHERE account = ?"))
+	defer func() { stmt.Close() }()
 	u := &User{}
-	stmt.QueryRow(account).Scan(u.ID, u.Account, u.PassHash)
+	stmt.QueryRow(account).Scan(&u.ID, &u.Account, &u.PassHash)
 
 	if u.Account != "" && CalcPassHash(u.Account, password) == u.PassHash {
 		return u
 	}
 
 	return nil
+}
+
+var validUserNameRe = regexp.MustCompile(`\A[0-9a-zA-Z_]{3,}\z`)
+var validUserPassRe = regexp.MustCompile(`\A[0-9a-zA-Z_]{6,}\z`)
+
+func ValidateUser(account, password string) bool {
+	if !(validUserNameRe.MatchString(account) && validUserPassRe.MatchString(password)) {
+		return false
+	}
+	return true
 }
 
 func CalcPassHash(account, password string) string {
@@ -71,4 +82,112 @@ func CalcSalt(str string) string {
 func Digest(str string) string {
 	hash := sha512.Sum512([]byte(str))
 	return hex.EncodeToString(hash[:])
+}
+
+func GetSessionUser(s sessions.Session) *User {
+	if s.GetString("account") != "" {
+		stmt := Must(db.Prepare("SELECT id, account, passhash WHERE id = ?"))
+		defer func() { stmt.Close() }()
+		u := &User{}
+		stmt.QueryRow(&u.ID, &u.Account, &u.PassHash)
+		return u
+	}
+	return nil
+}
+
+func GetTheme(id int) *Theme {
+	stmt := Must(db.Prepare(
+		"SELECT t.id, t.category_id, i.id, i.image " +
+			"FROM themes AS t " +
+			"LEFT JOIN images AS i ON t.image_id = i.id " +
+			"WHERE t.id = ?",
+	))
+	defer func() { stmt.Close() }()
+	t := &Theme{Image: &Image{}}
+	stmt.QueryRow(id).Scan(&t.ID, &t.CategoryId, &t.Image.ID, &t.Image.File)
+	return t
+}
+
+func CountJoke(themeID int) int {
+	stmt := Must(db.Prepare(
+		"SELECT COUNT(*) AS count FROM jokes WHERE theme_id = ?",
+	))
+	defer func() { stmt.Close() }()
+	var count int
+	stmt.QueryRow(themeID).Scan(&count)
+	return count
+}
+
+func GetLatestJokeByThemeIDCategoryID(themeID, categoryID int) *Joke {
+	stmt := Must(db.Prepare("SELECT id, content FROM " +
+		"jokes WHERE theme_id = ? AND category_id = ? " +
+		"ORDER BY created_at DESC LIMIT 1"))
+	defer func() { stmt.Close() }()
+	j := &Joke{}
+	stmt.QueryRow(themeID, categoryID).Scan(&j.ID, &j.Content)
+	return j
+}
+
+func GetLatestJokeByThemeID(themeID int) *Joke {
+	stmt := Must(db.Prepare("SELECT id, content FROM " +
+		"jokes WHERE theme_id = ? ORDER BY created_at DESC LIMIT 1"))
+	defer func() { stmt.Close() }()
+	j := &Joke{}
+	stmt.QueryRow(themeID).Scan(&j.ID, &j.Content)
+	return j
+}
+
+func ImgDir() string {
+	return "/uploads"
+}
+
+func Star(rate int) string {
+	white := "<img src=\"/img/white_star_16x16.png\">"
+	black := "<img src=\"/img/black_star_16x16.png\">"
+	switch rate {
+	case 1:
+		return black + white + white
+	case 2:
+		return black + black + white
+	}
+	//case 3:
+	return black + black + black
+}
+
+func GetThemeCategories() []string {
+	return ThemeCategories
+}
+
+func GetJokeCategories() []string {
+	return JokeCategories
+}
+
+func CalcOffset(page int) int {
+	if page > 1 {
+		return (page - 1) * ContentsPerPage
+	}
+	return 0
+}
+
+func CreatePage(url string, page, contentsSize int) (string, string) {
+	prev := ""
+	next := ""
+
+	if page == 0 {
+		page = 1
+	}
+
+	if page > 1 {
+		prev = url + "?page=" + strconv.Itoa(page-1)
+	}
+
+	if contentsSize == ContentsPerPage {
+		next = url + "?page=" + strconv.Itoa(page+1)
+	}
+
+	return prev, next
+}
+
+func ValidateCsrfToken(csrfToken string, s sessions.Session) bool {
+	return s.GetString("csrf_token") == csrfToken
 }
