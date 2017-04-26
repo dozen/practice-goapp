@@ -3,31 +3,31 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net/url"
 
 	"github.com/buaazp/fasthttprouter"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/kataras/go-sessions"
-	"github.com/kataras/go-sessions/sessiondb/redis"
-	"github.com/kataras/go-sessions/sessiondb/redis/service"
 	"github.com/valyala/fasthttp"
+	"html/template"
+	"github.com/go-redis/redis"
+	"strconv"
+	"bytes"
 )
 
 const (
 	SessionName     = "rack.session"
-	Port            = ":8080"
-	ContentsPerPage = 20
+	Port            = ":8081"
+	ContentsPerPage = 200
+	TplDir 		= "tpl/"
 )
 
 var (
 	baseUrl      *url.URL
 	db           *sql.DB
-	redisSession = redis.New(service.Config{
-		Addr:     ":6379",
-		Database: "0",
+	redi = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+
 	})
-	store sessions.Sessions
 
 	ThemeCategories = []string{
 		"人物",
@@ -47,17 +47,24 @@ var (
 		"例え",
 		"その他",
 	}
+	tpl      *template.Template
 )
+
+func InitTemplates() *template.Template {
+	       return template.Must(template.New("tmpl").Funcs(template.FuncMap{
+		       "joke_count": func(themeID int) string {
+				return redi.Get("joke_count:" + strconv.Itoa(themeID)).String()
+		       },
+		       }).ParseGlob(TplDir + "*.tpl"))
+	}
 
 func main() {
 	var e error
 	if db, e = sql.Open("mysql", "root:@/joker2"); e != nil {
 		panic(e)
 	}
-	store = sessions.New(sessions.Config{
-		Cookie: SessionName,
-	})
-	store.UseDatabase(redisSession)
+
+	tpl = InitTemplates()
 
 	r := fasthttprouter.New()
 	r.GET("/", index)
@@ -86,22 +93,77 @@ func main() {
 }
 
 func index(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-	for i := 0; i < 1000; i++ {
-		c.WriteString("Hello, World!")
+	c.SetContentType("text/html")
+
+	buf := bytes.NewBuffer([]byte{})
+
+	var page = 0
+	if pageString, ok := c.UserValue("page").(int); ok {
+		page = pageString
 	}
+
+	query :=
+	"SELECT t1.id, " +
+		"i.image, " +
+		"iu.account AS iu_account, " +
+		"tu.account AS tu_account, " +
+		"(SELECT content FROM jokes AS j WHERE j.theme_id = t1.id ORDER BY created_at DESC LIMIT 1) AS content " +
+		"FROM " +
+		"( SELECT t.id, t.user_id, t.image_id FROM themes AS t ORDER BY t.created_at, id DESC LIMIT ? OFFSET ? ) AS t1 " +
+		" JOIN images AS i ON t1.image_id = i.id " +
+		" JOIN users AS tu ON t1.user_id = tu.id" +
+		" JOIN users AS iu ON i.user_id = iu.id"
+
+	result, e := Must(db.Prepare(query)).Query(ContentsPerPage, page)
+	defer func() {
+		result.Close()
+	}()
+	if e != nil {
+		fmt.Errorf(e.Error())
+		return
+	}
+
+	var t []map[string]interface{}
+
+	for i:= 0;; i++ {
+		if !result.Next() {
+			break
+		}
+		var (
+			id int
+			iuAccount string
+			image string
+			tuAccount string
+			content string
+		)
+		result.Scan(
+			&id,
+			&image,
+			&iuAccount,
+			&tuAccount,
+			&content,
+		)
+		t = append(t, map[string]interface{}{
+			"id": id, "image": image, "iu_account": iuAccount, "tu_account": tuAccount, "content": content,
+		})
+	}
+
+	fmt.Printf("%#v\n", t)
+
+	prev, next := CreatePage(string(c.Referer()), page, ContentsPerPage)
+	tpl.ExecuteTemplate(buf, "index", map[string]interface{}{
+		"Themes": t,
+		"Prev": prev,
+		"Next": next,
+	})
+	c.Write(buf.Bytes())
 }
 
 func getLogin(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
 
 }
 
 func postLogin(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
 
 	fmt.Printf("%#v\n", string(c.FormValue("account")))
 	fmt.Printf("%#v\n", string(c.FormValue("password")))
@@ -110,53 +172,29 @@ func postLogin(c *fasthttp.RequestCtx) {
 func getLogout(c *fasthttp.RequestCtx) {
 	//s := store.StartFasthttp(c)
 
-	store.DestroyFasthttp(c)
-	log.Printf("%#v", store.StartFasthttp(c))
 }
 
 func getSignup(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
 
 }
 
 func postSignup(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
 
 }
 
 func getCategory(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
 
 	//id, ok := ParamID(c)
 
 }
 
 func getThemeIDNew(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	if jump := Authenticate(c, s); jump != nil {
-		jump()
-		return
-	}
 }
 
 func postThemeNew(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	if jump := Authenticate(c, s); jump != nil {
-		jump()
-		return
-	}
 }
 
 func getJokeIDNew(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-	if jump := Authenticate(c, s); jump != nil {
-		jump()
-		return
-	}
 
 	isNew, id, ok := ParamNew(c)
 
@@ -171,21 +209,7 @@ func getJokeIDNew(c *fasthttp.RequestCtx) {
 }
 
 func postJokeNew(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-	if jump := Authenticate(c, s); jump != nil {
-		jump()
-		return
-	}
-
 }
 
 func postRating(c *fasthttp.RequestCtx) {
-	s := store.StartFasthttp(c)
-	_ = s
-	if jump := Authenticate(c, s); jump != nil {
-		jump()
-		return
-	}
-
 }

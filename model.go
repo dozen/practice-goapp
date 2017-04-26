@@ -5,8 +5,8 @@ import (
 )
 
 type User struct {
-	ID        int
-	Account   string
+	ID        int	 `ruby:"id"`
+	Account   string `ruby:"account"`
 	PassHash  string
 	CreatedAt time.Time
 

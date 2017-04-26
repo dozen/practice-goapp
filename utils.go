@@ -8,6 +8,9 @@ import (
 	"github.com/valyala/fasthttp"
 	"regexp"
 	"strconv"
+	"fmt"
+	marshal "github.com/dozen/ruby-marshal"
+	"bytes"
 )
 
 func Must(stmt *sql.Stmt, err error) *sql.Stmt {
@@ -15,6 +18,27 @@ func Must(stmt *sql.Stmt, err error) *sql.Stmt {
 		panic(err)
 	}
 	return stmt
+}
+
+type Session struct {
+	CsrfToken string `ruby:"csrf_token"`
+	User `ruby:"user"`
+	Flash `ruby:"__FLASH__"`
+}
+
+type Flash struct {}
+
+func GetSession(c *fasthttp.RequestCtx) Session {
+	cookie := string(c.Request.Header.Cookie("rack.session"))
+	b, e := redi.Get("rack:session:" + cookie).Bytes()
+	fmt.Printf("%#v", cookie)
+	if e != nil {
+		fmt.Printf("GetSession Error: %#v\n", e)
+		return Session{}
+	}
+	s := Session{}
+	marshal.NewDecoder(bytes.NewReader(b)).Decode(&s)
+	return s
 }
 
 func ParamID(c *fasthttp.RequestCtx) (int, bool) {
